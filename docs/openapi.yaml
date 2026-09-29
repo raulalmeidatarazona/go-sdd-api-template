@@ -1,0 +1,63 @@
+openapi: 3.1.0
+info:
+  title: Job example API
+  version: 1.0.0
+  description: Replace this example contract with a product-specific spec before production.
+servers:
+  - url: http://localhost:8080
+paths:
+  /live:
+    get:
+      summary: Process liveness
+      responses:
+        '200': { description: Process is alive }
+  /ready:
+    get:
+      summary: Database and outbox readiness
+      responses:
+        '200': { description: Ready for traffic }
+        '503': { description: Database unavailable or outbox delivery lag exceeded }
+  /v1/jobs:
+    post:
+      summary: Create a Job idempotently
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+      responses:
+        '201': { description: New Job and event saved }
+        '200': { description: Existing Job returned for the same key and request }
+        '400': { description: Invalid input }
+        '401': { description: Missing or invalid API key }
+        '409': { description: Key reused for a different request }
+  /v1/jobs/{id}:
+    get:
+      summary: Read a Job by ID
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Job found }
+        '401': { description: Missing or invalid API key }
+        '404': { description: Job not found }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Bootstrap API key; replace with product-specific authentication and authorization.

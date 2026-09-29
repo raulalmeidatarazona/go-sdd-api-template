@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+coverage/
+dist/
+node_modules/
+.DS_Store
+*.log
+__pycache__/
+*.pyc
+
+coverage.out
+!scripts/check_secrets.py

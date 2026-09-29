@@ -1,0 +1,39 @@
+name: quality
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.6-alpine
+        env:
+          POSTGRES_DB: app
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U app -d app"
+          --health-interval 3s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: SDD diff gate
+        if: github.event_name == 'pull_request'
+        run: python3 scripts/check_sdd.py --base ${{ github.event.pull_request.base.sha }}
+      - name: Create isolated test database
+        env:
+          PGPASSWORD: app
+        run: psql -h localhost -U app -d app -c 'CREATE DATABASE app_test'
+      - name: Full gate
+        env:
+          DATABASE_URL: postgres://app:app@localhost:5432/app?sslmode=disable
+          TEST_DATABASE_URL: postgres://app:app@localhost:5432/app_test?sslmode=disable
+        run: make check
