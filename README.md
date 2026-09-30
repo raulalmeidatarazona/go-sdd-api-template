@@ -7,10 +7,9 @@ An opinionated, small starting point for a Go service: spec-driven development, 
 Requires Go 1.27+, Python 3, PostgreSQL 16+ (Docker Compose is included), `psql` for remote migrations (local Docker includes it), and Git. Install `govulncheck` through the pinned `make security` command. No hidden global agent setup is required.
 
 ```sh
-git clone <this-repository> my-service
+git clone git@github.com:raulalmeidatarazona/go-sdd-api-template.git my-service
 cd my-service
-go mod edit -module github.com/<owner>/<my-service>
-go mod tidy
+python3 scripts/rename_module.py github.com/your-org/my-service
 cp .env.example .env
 make bootstrap
 docker compose up -d db
