@@ -30,7 +30,7 @@ coverage:
 	python3 scripts/check_coverage.py 80
 
 security:
-	go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+	go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 
 fast: fmt arch sdd secrets deps test
 

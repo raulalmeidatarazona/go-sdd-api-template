@@ -10,7 +10,7 @@ Validated on 2026-09-29 with the pinned runtimes in this repository. This record
 
 ## Commands actually run
 
-- `make check`: passed. Core coverage **95.6%**, minimum 80%; race tests, architecture, database integration and event retry tests passed; `govulncheck` reported no reachable vulnerabilities after upgrading `pgx` to 5.9.2.
+- `make check`: passed. Core coverage **95.6%**, minimum 80%; race tests, architecture, database integration and event retry tests passed; `govulncheck` reported no reachable vulnerabilities after upgrading `pgx` to 5.9.2. CI on Linux exposed a panic in `govulncheck` v1.1.4 with Go 1.27; the pinned scanner was upgraded to v1.8.0.
 - `make migrate` and live HTTP smoke requests: passed.
 
 ## Manual review and remaining risk
