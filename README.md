@@ -7,7 +7,8 @@ An opinionated, small starting point for a Go service: spec-driven development, 
 Requires Go 1.27+, Python 3, PostgreSQL 16+ (Docker Compose is included), `psql` for remote migrations (local Docker includes it), and Git. Install `govulncheck` through the pinned `make security` command. No hidden global agent setup is required.
 
 ```sh
-git clone git@github.com:raulalmeidatarazona/go-sdd-api-template.git my-service
+# First use GitHub's "Use this template" button to create YOUR_ORG/my-service.
+git clone git@github.com:YOUR_ORG/my-service.git
 cd my-service
 python3 scripts/rename_module.py github.com/your-org/my-service
 cp .env.example .env
@@ -18,11 +19,13 @@ make check
 make run
 ```
 
-Replace the repository/module name, sample API key and constitution before creating business features. `make bootstrap` configures versioned hooks in this clone. Use the GitHub **Use this template** button when available; cloning also works.
+Replace the module name, sample API key and constitution before creating business features. `make bootstrap` configures versioned hooks in this clone. If you clone this source repository directly, create a new GitHub repository and change `origin` to its URL before pushing.
 
 ```sh
 set -a; . ./.env; set +a
-curl -sS -H "Authorization: Bearer $API_KEY"   -H 'Idempotency-Key: demo-1' -H 'Content-Type: application/json'   -d '{"name":"example"}' http://localhost:8080/v1/jobs
+curl -sS -H "Authorization: Bearer $API_KEY" \
+  -H 'Idempotency-Key: demo-1' -H 'Content-Type: application/json' \
+  -d '{"name":"example"}' http://localhost:8080/v1/jobs
 curl -sS http://localhost:8080/live
 curl -sS http://localhost:8080/ready
 ```
@@ -41,6 +44,6 @@ The API reads settings from the environment; `make run` loads `.env` locally. In
 - `make fast`: format, architecture, SDD, secrets and focused tests.
 - `make check`: full tests/coverage, isolated PostgreSQL integration, dependency integrity and vulnerability scan.
 - `.githooks/pre-commit` runs the fast gate; `.githooks/pre-push` runs the full gate; CI repeats it.
-- Set GitHub repository as a template and protect `main`: require `quality` status, PR review, no force push or direct push; enable Dependabot and secret scanning. Admin settings cannot be encoded by Git hooks alone.
+- Protect `main` in each new GitHub repository: require `quality` status, one reviewer, no force push or direct push; enable Dependabot and secret scanning. Add a collaborator who can review PRs. Admin settings are not inherited by repositories created from a template and cannot be encoded by Git hooks alone.
 
 See `docs/OPERATIONS.md` before any production deployment. The sample API key is a bootstrap guard, not a product authorization system.
