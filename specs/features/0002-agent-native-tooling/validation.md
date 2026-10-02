@@ -8,6 +8,7 @@ Validated locally on 2026-10-02 with Go 1.27, Node.js 24.14 and PostgreSQL 16.6.
 - `npm test --prefix agents/mcp`: three tests passed; a real MCP client connected over stdio, listed tools, and traversal/symlink reads were refused.
 - In a disposable copy, `go run ./tools/repoguard rename-module github.com/example/new-api` followed by `go test ./...`: passed.
 - `opencode mcp list`: project server connected. Claude Code is not installed on this machine. Codex's project MCP config is loaded only after the checkout is trusted; its runtime connection was not exercised here.
+- The first Linux CI run caught `tools/repoguard/secrets.go` missing from the commit because a machine-level global Git ignore pattern matched its name. The file was force-added and the full gate was rerun. This shows why the remote gate remains required even after a local pass.
 
 ## Remaining work for a new service
 
