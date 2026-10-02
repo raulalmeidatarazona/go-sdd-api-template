@@ -1,0 +1,4 @@
+[mcp_servers.project_specs]
+command = "node"
+args = ["agents/mcp/mcp.js"]
+cwd = "."
