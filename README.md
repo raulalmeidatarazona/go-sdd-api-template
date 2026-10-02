@@ -4,15 +4,16 @@ An opinionated, small starting point for a Go service: spec-driven development, 
 
 ## Start a new service
 
-Requires Go 1.27+, Python 3, PostgreSQL 16+ (Docker Compose is included), `psql` for remote migrations (local Docker includes it), and Git. Install `govulncheck` through the pinned `make security` command. No hidden global agent setup is required.
+Requires Go 1.27+, PostgreSQL 16+ (Docker Compose is included), `psql` for remote migrations (local Docker includes it), Git and Node.js 24+ for the optional local agent MCP extension and its CI gate. The repository checks and module renamer are written in Go; no Python runtime is needed.
 
 ```sh
 # First use GitHub's "Use this template" button to create YOUR_ORG/my-service.
 git clone git@github.com:YOUR_ORG/my-service.git
 cd my-service
-python3 scripts/rename_module.py github.com/your-org/my-service
+go run ./tools/repoguard rename-module github.com/your-org/my-service
 cp .env.example .env
 make bootstrap
+npm ci --prefix agents/mcp
 docker compose up -d db
 make migrate
 make check
@@ -34,14 +35,14 @@ The API reads settings from the environment; `make run` loads `.env` locally. In
 
 ## Work with an agent
 
-1. Read `AGENTS.md` and `docs/INDEX.md`.
+1. Read `AGENTS.md`, `docs/INDEX.md` and [the agent setup](agents/README.md).
 2. Create `specs/features/<id>/` from `specs/templates/feature/` and agree on `spec.md`.
 3. Plan slices in `plan.md`, implement one slice, record actual checks in `validation.md`.
 4. Run `make check`, review the diff and open a PR. See `docs/WORKFLOW.md` for ready-to-use prompts.
 
 ## Gates and repository setup
 
-- `make fast`: format, architecture, SDD, secrets and focused tests.
+- `make fast`: format, architecture, SDD, secrets, focused tests and MCP protocol test/audit.
 - `make check`: full tests/coverage, isolated PostgreSQL integration, dependency integrity and vulnerability scan.
 - `.githooks/pre-commit` runs the fast gate; `.githooks/pre-push` runs the full gate; CI repeats it.
 - Protect `main` in each new GitHub repository: require `quality` status, one reviewer, no force push or direct push; enable Dependabot and secret scanning. Add a collaborator who can review PRs. Admin settings are not inherited by repositories created from a template and cannot be encoded by Git hooks alone.

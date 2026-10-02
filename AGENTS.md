@@ -21,5 +21,6 @@ Read `docs/INDEX.md` first. Read only the linked document needed for the current
 - `docs/SECURITY.md`: threat model and controls.
 - `docs/WORKFLOW.md`: SDD phases and prompt examples.
 - `specs/`: feature intent, plans, validation and decisions.
+- `agents/README.md`: shared skills, prompts and local MCP setup for Codex, Claude Code and OpenCode.
 
 If a source document conflicts with a current user request, ask only when the repository's executable safety gates would need changing; otherwise follow the user and update the relevant spec.

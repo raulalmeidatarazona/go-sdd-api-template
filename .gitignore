@@ -10,4 +10,3 @@ __pycache__/
 *.pyc
 
 coverage.out
-!scripts/check_secrets.py
