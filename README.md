@@ -1,50 +1,91 @@
 # Go backend API template
 
-An opinionated, small starting point for a Go service: spec-driven development, ports and adapters, explicit command/query separation, PostgreSQL transaction + outbox, strict quality gates and operational runbooks. The sample Job context is replaceable. Read [the map](docs/INDEX.md) and [API contract](docs/openapi.yaml) before expanding the template.
+This repository demonstrates a small backend service that accepts retried job-creation requests without creating duplicate records or losing the matching event.<br>
+It keeps the job and event durable in one PostgreSQL transaction, then delivers events to a webhook with retryable, at-least-once semantics.
 
-## Start a new service
+It is a runnable Go template with one example bounded context, explicit application ports, PostgreSQL persistence, HTTP endpoints, tests, and documented quality gates.
 
-Requires Go 1.27+, PostgreSQL 16+ (Docker Compose is included), `psql` for remote migrations (local Docker includes it), Git and Node.js 24+ for the optional local agent MCP extension and its CI gate. The repository checks and module renamer are written in Go; no Python runtime is needed.
+## Architecture
+
+```mermaid
+flowchart LR
+    Client[API client] --> HTTP[HTTP adapter]
+    HTTP --> App[Job application service]
+    App --> Domain[Job domain]
+    App --> Store[Job store port]
+    Store -->|one transaction| PG[(PostgreSQL)]
+    PG --> Jobs[(jobs table)]
+    PG --> Outbox[(outbox table)]
+    Worker[Outbox worker] -->|claim and acknowledge| PG
+    Worker --> Publisher[Webhook publisher]
+    Publisher --> Receiver[External receiver]
+```
+
+The HTTP adapter handles validation and the bootstrap API key. The application service owns use-case rules; the PostgreSQL adapter implements the store port. The worker and publisher are started only when `EVENT_WEBHOOK_URL` is configured.
+
+## Run locally
+
+Requires Go 1.27.2+, Docker Compose and `psql` (or the Compose fallback used by `make migrate`). From the repository root, prepare PostgreSQL and apply the schema:
 
 ```sh
-# First use GitHub's "Use this template" button to create YOUR_ORG/my-service.
-git clone git@github.com:YOUR_ORG/my-service.git
-cd my-service
-go run ./tools/repoguard rename-module github.com/your-org/my-service
-cp .env.example .env
-make bootstrap
-npm ci --prefix agents/mcp
-docker compose up -d db
-make migrate
-make check
+cp .env.example .env && docker compose up -d db && make migrate
+```
+
+Then start the API in one command:
+
+```sh
 make run
 ```
 
-Replace the module name, sample API key and constitution before creating business features. `make bootstrap` configures versioned hooks in this clone. If you clone this source repository directly, create a new GitHub repository and change `origin` to its URL before pushing.
+`make run` loads `.env` and starts the API on `localhost:8080`. In another terminal, create and read a job:
 
 ```sh
 set -a; . ./.env; set +a
-curl -sS -H "Authorization: Bearer $API_KEY" \
-  -H 'Idempotency-Key: demo-1' -H 'Content-Type: application/json' \
-  -d '{"name":"example"}' http://localhost:8080/v1/jobs
-curl -sS http://localhost:8080/live
-curl -sS http://localhost:8080/ready
+IDEMPOTENCY_KEY="demo-$(date +%s)-$$"
+curl -i -H "Authorization: Bearer $API_KEY" -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H 'Content-Type: application/json' -d '{"name":"example"}' \
+  http://localhost:8080/v1/jobs
+curl -i http://localhost:8080/live
+curl -i http://localhost:8080/ready
 ```
 
-The API reads settings from the environment; `make run` loads `.env` locally. In development, the outbox persists events even without a receiver. Set `EVENT_WEBHOOK_URL` and `EVENT_WEBHOOK_TOKEN` to start delivery. In production, both are required and the URL must use HTTPS. A receiver must deduplicate `X-Event-Id` and return 2xx only after processing durably. Never treat a webhook as guaranteed delivery without that contract.
+The first create returns `201`; a retry with the same key and normalized name returns `200` with the same job. A request with the same key and a different name returns `409`. The example API key is only a local bootstrap guard, not product authentication.
 
-## Work with an agent
+## Design decisions and trade-offs
 
-1. Read `AGENTS.md`, `docs/INDEX.md` and [the agent setup](agents/README.md).
-2. Create `specs/features/<id>/` from `specs/templates/feature/` and agree on `spec.md`.
-3. Plan slices in `plan.md`, implement one slice, record actual checks in `validation.md`.
-4. Run `make check`, review the diff and open a PR. See `docs/WORKFLOW.md` for ready-to-use prompts.
+- **Idempotent create:** the database uniquely constrains the idempotency key and stores a hash of the normalized name. A repeat with the same name returns the existing job; a repeat with a different name conflicts. Keys are required and limited to 1–128 bytes after trimming. This protects retries for this create operation; it is not a general idempotency framework.
+- **Transactional outbox:** the job row and versioned `JobCreated.v1` event are committed together in PostgreSQL. The worker publishes after commit and marks an event delivered only after a 2xx response. This avoids losing the event between the business write and event recording, while keeping PostgreSQL as the single durable store.
+- **At-least-once delivery:** a crash after the receiver accepts an event but before the database records delivery can cause a duplicate. The stable `X-Event-Id` lets the receiver deduplicate. Failed publishes remain pending with increasing retry delays; events are not automatically discarded.
+- **Polling and concurrency:** the worker polls PostgreSQL and selects pending rows with `FOR UPDATE SKIP LOCKED`. This lets multiple worker processes claim different rows. Each process handles one event at a time, holds its database transaction while publishing, and can retry after a failure. This is intentionally simpler than adding a broker; it also means throughput and lock duration have not been benchmarked here.
+- **Consistency and reads:** the API reads the job from the same PostgreSQL store used for writes. The outbox guarantees atomic persistence of a job and its event, not exactly-once delivery or immediate completion of a job. The sample job remains `pending`; there is no job processor.
+- **Health checks:** `/live` checks that the HTTP process responds. `/ready` checks database access and whether any undelivered event is older than the configured lag threshold.
 
-## Gates and repository setup
+## Tests and quality gates
 
-- `make fast`: format, architecture, SDD, secrets, focused tests and MCP protocol test/audit.
-- `make check`: full tests/coverage, isolated PostgreSQL integration, dependency integrity and vulnerability scan.
-- `.githooks/pre-commit` runs the fast gate; `.githooks/pre-push` runs the full gate; CI repeats it.
-- Protect `main` in each new GitHub repository: require `quality` status, one reviewer, no force push or direct push; enable Dependabot and secret scanning. Add a collaborator who can review PRs. Admin settings are not inherited by repositories created from a template and cannot be encoded by Git hooks alone.
+Run the Go unit and HTTP tests with the race detector:
 
-See `docs/OPERATIONS.md` before any production deployment. The sample API key is a bootstrap guard, not a product authorization system.
+```sh
+make test
+```
+
+Run the full repository gate with Go, Node.js 24+, Docker, and a separate PostgreSQL test database available. Set `TEST_DATABASE_URL` (see `.env.example`); `DATABASE_URL` is used for local database access and must not be the same database as the test URL.
+
+```sh
+make check
+```
+
+The full gate includes formatting, architecture and spec checks, secret scans, tests and coverage, MCP checks, dependency verification, vulnerability scanning, Git history scanning, and PostgreSQL integration tests. It reports which checks actually ran; the results depend on the local environment.
+
+## What this demonstrates
+
+This example shows how I structure a Go backend around explicit use cases and ports, test domain and HTTP behavior, protect a write path against retries, and reason about durable event delivery and failure recovery. It also shows a spec-driven workflow with operational and security constraints documented alongside the code.
+
+The repository is a focused template, not evidence of a production deployment or measured scale. It does not include product-specific user authorization, rate limiting, a broker, a job execution engine, separate read storage, production observability, an SLO, or performance benchmarks. Before production, those requirements need their own specifications, implementations, and validation.
+
+## Repository guide
+
+- [`docs/INDEX.md`](docs/INDEX.md): documentation map.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): dependency directions and example flow.
+- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) and [`docs/SECURITY.md`](docs/SECURITY.md): failure handling and security controls.
+- [`docs/openapi.yaml`](docs/openapi.yaml): HTTP contract.
+- [`specs/`](specs/): feature intent, plans, decisions, and validation records.
