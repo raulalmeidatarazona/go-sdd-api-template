@@ -26,4 +26,4 @@ The example does not model authorization beyond a bootstrap API key, job process
 
 ## Dependency rationale
 
-One PostgreSQL driver is necessary for durable transactional storage. No CQRS or event bus framework is needed for one example.
+One PostgreSQL driver is necessary for durable transactional storage. No CQRS or event bus framework is needed for one example. The indirect `golang.org/x/text` dependency is pinned at v0.41.0 to include the fix for GO-2026-6629 reported by `govulncheck`; the Go minimum is 1.27.2 to include the standard-library fixes reported by the same gate. The associated `golang.org/x/sync` indirect update is retained as resolved by the Go module graph.

@@ -1,19 +1,19 @@
-.PHONY: bootstrap fmt arch sdd secrets secrets-history deps test coverage security fast check run migrate integration
+.PHONY: bootstrap fmt arch sdd secrets secrets-history deps test coverage security fast check run migrate integration agent-check
 
 bootstrap:
 	git config core.hooksPath .githooks
 
 fmt:
-	@test -z "$$(gofmt -l $$(find cmd internal -name '*.go'))" || (echo 'Run gofmt on Go files' && exit 1)
+	@test -z "$$(gofmt -l $$(find cmd internal tools -name '*.go'))" || (echo 'Run gofmt on Go files' && exit 1)
 
 arch:
-	python3 scripts/archcheck.py
+	go run ./tools/repoguard arch
 
 sdd:
-	python3 scripts/check_sdd.py --staged
+	go run ./tools/repoguard sdd --staged
 
 secrets:
-	python3 scripts/check_secrets.py
+	go run ./tools/repoguard secrets
 
 secrets-history:
 	docker run --rm -v "$$(pwd):/repo" -w /repo zricethezav/gitleaks@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854 git -v --no-banner --redact /repo
@@ -27,12 +27,17 @@ test:
 
 coverage:
 	go test -coverprofile=coverage.out ./internal/domain ./internal/application ./internal/adapters/httpapi
-	python3 scripts/check_coverage.py 80
+	go run ./tools/repoguard coverage 80
 
 security:
 	go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 
-fast: fmt arch sdd secrets deps test
+agent-check:
+	npm ci --prefix agents/mcp --ignore-scripts
+	npm test --prefix agents/mcp
+	npm audit --prefix agents/mcp --audit-level high
+
+fast: fmt arch sdd secrets deps test agent-check
 
 integration:
 	@set -e; set -a; if test -f .env; then . ./.env; fi; set +a; \

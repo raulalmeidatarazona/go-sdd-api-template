@@ -11,5 +11,6 @@ Start here, then open only what you need.
 | API contract | `docs/openapi.yaml`, HTTP tests and feature spec |
 | Release or incident | `docs/OPERATIONS.md`, `docs/QUALITY_GATES.md` |
 | Understand course influences | `docs/COURSE_DERIVATION.md` |
+| Configure a local coding agent | `agents/README.md`, then the relevant `.agents/skills` entry |
 
 The map is stable; details live next to their owners. Update an existing page when a fact changes. Add a new page only when a new decision cannot fit its owner. Every feature spec links to relevant decisions and validation evidence. The executable gates, lockfile and migrations are the authoritative record of implemented behavior.
